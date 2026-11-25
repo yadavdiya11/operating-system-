@@ -1,0 +1,143 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NEXUS – Disk Scheduling Analyzer</title>
+<style>
+:root{--bg:#080D1B;--side:#10182B;--card:#151F35;--cy:#00E5FF;--bl:#398BFF;--pu:#A855F7;--tx:#F8FAFC;--mu:#94A3B8;--ok:#10B981}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+body{margin:0;background:radial-gradient(circle at 80% 0,#1a1040 0,var(--bg) 45%) fixed;color:var(--tx);font:14px 'Segoe UI',system-ui,sans-serif;display:flex;min-height:100vh}
+aside{width:210px;background:var(--side);padding:20px 14px;border-right:1px solid #ffffff14;position:sticky;top:0;height:100vh;flex-shrink:0}
+aside h1{font-size:20px;letter-spacing:4px;color:var(--cy);text-shadow:0 0 14px var(--cy);margin:0 0 24px}
+aside a{display:block;padding:10px 12px;border-radius:8px;color:var(--mu);text-decoration:none;margin-bottom:4px;transition:.2s}
+aside a:hover,aside a.on{background:#00e5ff18;color:var(--cy);box-shadow:inset 0 0 0 1px #00e5ff55}
+#eng{position:absolute;bottom:16px;left:14px;right:14px;font-size:11px;color:var(--mu);border-top:1px solid #ffffff14;padding-top:10px}
+#eng i{display:inline-block;width:8px;height:8px;border-radius:50%;background:#64748b;margin-right:6px}#eng.ok i{background:var(--ok);box-shadow:0 0 8px var(--ok)}#eng.bad i{background:#f87171}
+main{flex:1;padding:22px;overflow:auto;min-width:0}
+.card{background:#151F35cc;backdrop-filter:blur(10px);border:1px solid #00e5ff33;border-radius:14px;padding:16px;margin-bottom:18px;box-shadow:0 0 24px #a855f71a;scroll-margin-top:12px}
+h2{margin:0 0 12px;font-size:15px;color:var(--cy);letter-spacing:1px;text-transform:uppercase}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:18px}.stats .card{margin:0}
+.stat b{display:block;font-size:24px;color:var(--tx);text-shadow:0 0 10px var(--bl)}.stat span{color:var(--mu);font-size:12px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+label{color:var(--mu);font-size:12px;display:block;margin-bottom:4px}
+input,select{width:100%;padding:9px;background:#0a1224;border:1px solid #398bff55;border-radius:8px;color:var(--tx)}
+input:focus,select:focus{outline:none;border-color:var(--cy);box-shadow:0 0 8px #00e5ff55}
+.full{grid-column:1/-1}
+button{background:linear-gradient(135deg,var(--bl),var(--pu));border:0;color:#fff;padding:9px 14px;border-radius:8px;cursor:pointer;margin:8px 6px 0 0;transition:.2s;font:inherit}
+button:hover{box-shadow:0 0 16px var(--pu);transform:translateY(-1px)}button.g{background:#1e2a47;border:1px solid var(--cy)}
+canvas{width:100%;height:300px;display:block;background:#0a1224;border-radius:10px}
+.tw{max-height:360px;overflow:auto}
+table{width:100%;border-collapse:collapse}th,td{padding:7px;text-align:left;border-bottom:1px solid #ffffff12}th{color:var(--mu);font-weight:500;position:sticky;top:0;background:#101a2e}
+tr.best td{color:var(--ok);font-weight:600}tr.cur td{background:#00e5ff14}#seq tr{cursor:pointer}
+.bar{height:14px;border-radius:7px;background:linear-gradient(90deg,var(--cy),var(--pu));box-shadow:0 0 10px var(--cy);transition:width .5s}
+#err{color:#f87171;margin-top:8px;min-height:1em}#expl{color:var(--mu);line-height:1.6}
+.leg{color:var(--mu);font-size:12px;margin:8px 0 0}.leg i{display:inline-block;width:9px;height:9px;border-radius:50%;margin:0 4px 0 12px}
+@media(max-width:760px){body{display:block}aside{position:static;width:auto;height:auto;display:flex;flex-wrap:wrap;gap:4px;padding:10px}aside h1{width:100%;margin:0 0 6px}aside a{margin:0}#eng{display:none}}
+@media print{body{background:#fff;color:#000;display:block}aside,button,#config,#sim .ctl{display:none}.card{background:#fff;border:1px solid #ccc;box-shadow:none;color:#000}h2,.stat b{color:#000;text-shadow:none}.stat span,th,td{color:#000}canvas{background:#fff;border:1px solid #ccc}.tw{max-height:none;overflow:visible}}
+</style></head><body>
+<aside><h1>NEXUS</h1><a href="#overview">Overview</a><a href="#config">Disk Configuration</a><a href="#sim">Simulation</a><a href="#cmp">Algorithm Comparison</a><a href="#rep">Reports</a><a href="#about">About Project</a>
+<div id="eng"><i></i><span>Connecting…</span></div></aside>
+<main>
+<div id="overview" class="stats">
+<div class="card stat"><b id="s0">0</b><span>Total Requests</span></div><div class="card stat"><b id="s1">0</b><span>Initial Head</span></div>
+<div class="card stat"><b id="s2">0</b><span>Total Head Movement</span></div><div class="card stat"><b id="s3">0</b><span>Avg Seek Distance</span></div>
+<div class="card stat"><b id="s6">0</b><span>Est. Seek Time (ms)</span></div>
+<div class="card stat"><b id="s4">–</b><span>Best Algorithm</span></div><div class="card stat"><b id="s5">0</b><span>Algorithms Analyzed</span></div></div>
+<div id="config" class="card"><h2>Disk Configuration</h2><div class="grid">
+<div class="full"><label>Request sequence (comma or space separated)</label><input id="req" placeholder="98, 183, 37, 122, 14, 124, 65, 67"></div>
+<div><label>Head position</label><input id="head" type="number"></div><div><label>Min cylinder</label><input id="min" type="number" value="0"></div>
+<div><label>Max cylinder</label><input id="max" type="number" value="199"></div>
+<div><label>Direction</label><select id="dir"><option value="1">Right (increasing)</option><option value="0">Left (decreasing)</option></select></div>
+<div><label>Algorithm</label><select id="alg"><option value="0">FCFS</option><option value="1">SSTF</option><option value="2">SCAN</option><option value="3">C-SCAN</option><option value="4">LOOK</option><option value="5">C-LOOK</option></select></div>
+<div><label>Seek time / cylinder (ms)</label><input id="ms" type="number" value="1" min="0" step="0.1"></div></div>
+<button id="run">Run Simulation</button><button id="all">Compare All</button><button class="g" id="rnd">Generate Random</button><button class="g" id="ex">Load Example</button><button class="g" id="rst">Reset</button><div id="err"></div></div>
+<div id="sim" class="card"><h2>Simulation <span id="title" style="color:var(--mu)"></span></h2><canvas id="cv" width="1100" height="300"></canvas>
+<p class="leg"><i style="background:#10B981"></i>Start head<i style="background:#A855F7"></i>Request served<i style="background:#94A3B8"></i>Boundary / jump</p>
+<div class="ctl"><button id="play">Play</button><button class="g" id="pause">Pause</button><button class="g" id="prev">Prev</button><button class="g" id="next">Next</button><button class="g" id="sreset">Reset</button>
+<label style="display:inline-block;margin-left:10px">Speed</label> <input id="spd" type="range" min="1" max="10" value="5" style="width:140px;display:inline-block;vertical-align:middle"></div>
+<p id="expl">Run a simulation to begin. (Keyboard: ← → step, Space play/pause)</p></div>
+<div id="cmp" class="card"><h2>Algorithm Comparison</h2><table id="ctab"><tr><th>Rank</th><th>Algorithm</th><th>Total movement</th><th>Avg seek</th><th style="width:35%">Relative</th></tr></table></div>
+<div id="rep" class="card"><h2>Reports</h2><button id="csv">Download CSV</button><button class="g" id="pdf">Export PDF (Print)</button>
+<div class="tw" style="margin-top:10px"><table id="seq"><tr><th>#</th><th>Cylinder</th><th>Seek</th><th>Cumulative</th><th>Type</th></tr></table></div></div>
+<div id="about" class="card"><h2>About</h2><p style="color:var(--mu);line-height:1.6">All scheduling math runs in C (<code>backend/algorithms.c</code>). The Python server loads it as a shared library (or the browser loads the optional WebAssembly build). This page only renders what the C engine returns.<br><br>
+<b style="color:var(--tx)">Conventions:</b> SCAN / C-SCAN travel to the disk edge; LOOK / C-LOOK stop at the last request. C-SCAN / C-LOOK return jumps are counted in total movement. Duplicate requests are kept (0-cost seeks).<br><br>
+<b style="color:var(--tx)">Algorithms:</b> FCFS (arrival order) · SSTF (nearest request first) · SCAN (elevator) · C-SCAN (circular elevator) · LOOK · C-LOOK.</p></div>
+</main>
+<script>
+const $=i=>document.getElementById(i),NAMES=["FCFS","SSTF","SCAN","C-SCAN","LOOK","C-LOOK"],EX="98,183,37,122,14,124,65,67";
+let engine=null,run=null,all=[],idx=0,timer=null;
+
+/* ---------- engine: C server API first, optional WebAssembly fallback ---------- */
+function badge(cls,txt){const e=$("eng");e.className=cls;e.lastChild.textContent=txt}
+async function initEngine(){
+ try{const r=await fetch("/api/health",{cache:"no-store"});if(r.ok){
+  const post=async(u,c,extra)=>{const x=await fetch(u,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({...c,...extra})});return x.json()};
+  engine={name:"C engine (native)",one:(id,c)=>post("/api/run",c,{alg:id}),many:c=>post("/api/compare",c,{})};return}}catch(e){}
+ try{await new Promise((ok,no)=>{const s=document.createElement("script");s.src="nexus.js";s.onload=ok;s.onerror=no;document.head.appendChild(s)});
+  const m=await NexusModule();
+  const one=async(id,c)=>{const p=m.ccall("nexus_run","number",["number","string","number","number","number","number"],[id,c.req,c.head,c.min,c.max,c.dir]);const s=m.UTF8ToString(p);m.ccall("nexus_free",null,["number"],[p]);return JSON.parse(s)};
+  engine={name:"C engine (WebAssembly)",one,many:async c=>Promise.all(NAMES.map((_,i)=>one(i,c)))};return}catch(e){}
+ engine=null}
+
+/* ---------- helpers ---------- */
+function cfg(){return{req:$("req").value,head:+$("head").value,min:+$("min").value,max:+$("max").value,dir:+$("dir").value}}
+function validate(){const c=cfg();if(!c.req.trim())return"Enter at least one request.";if(!/^[\d,\s-]+$/.test(c.req))return"Requests must be integers (e.g. 98, 183, 37).";
+ if($("head").value===""||[c.head,c.min,c.max].some(isNaN))return"Head and cylinder range must be numbers.";if(c.min>=c.max)return"Min must be less than Max.";
+ if(c.head<c.min||c.head>c.max)return"Head must lie between Min and Max.";return""}
+function guard(){if(!engine){$("err").textContent="Engine not available. Start with ./run.sh (or build WASM) – see README.";return false}const e=validate();$("err").textContent=e;return!e}
+function count(el,v,d=0){const t=+v,s=performance.now();(function f(n){const k=Math.min(1,(n-s)/600);el.textContent=(t*k).toFixed(d);if(k<1)requestAnimationFrame(f);else el.textContent=t.toFixed(d)})(s)}
+function cum(k){let t=0;for(let i=0;i<=k;i++)t+=run.steps[i].s;return t}
+function fit(){const cv=$("cv"),r=window.devicePixelRatio||1,w=cv.clientWidth||1100;cv.width=Math.round(w*r);cv.height=Math.round(300*r)}
+
+/* ---------- actions ---------- */
+async function runOne(){if(!guard())return;let r;try{r=await engine.one(+$("alg").value,cfg())}catch(e){$("err").textContent="Server not reachable.";return}
+ if(r.error){$("err").textContent=r.error;return}run=r;idx=0;stop();$("err").textContent="";
+ $("title").textContent="— "+r.name;count($("s0"),r.n);count($("s1"),r.head);count($("s2"),r.total);count($("s3"),r.avg,2);count($("s6"),r.total*(+$("ms").value||0),1);draw();table()}
+async function compare(){if(!guard())return;let res;try{res=await engine.many(cfg())}catch(e){$("err").textContent="Server not reachable.";return}
+ if(res.error||res[0]?.error){$("err").textContent=res.error||res[0].error;return}all=res;
+ const s=[...all].sort((a,b)=>a.total-b.total),mx=s[s.length-1].total||1,bt=s[0].total,ties=s.filter(x=>x.total===bt).map(x=>x.name);
+ $("s4").textContent=ties.join(" / ");$("s4").style.fontSize=ties.length>2?"15px":"";count($("s5"),6);
+ const t=$("ctab");t.innerHTML=t.rows[0].outerHTML;
+ s.forEach((r,i)=>{const tr=t.insertRow();if(r.total===bt)tr.className="best";
+  [i+1,r.name,r.total,r.avg.toFixed(2)].forEach(v=>tr.insertCell().textContent=v);
+  const b=document.createElement("div");b.className="bar";b.style.width=(r.total/mx*100)+"%";tr.insertCell().appendChild(b)})}
+function draw(){const cv=$("cv"),g=cv.getContext("2d"),r=window.devicePixelRatio||1;g.setTransform(r,0,0,r,0,0);const W=cv.width/r,H=300;g.clearRect(0,0,W,H);if(!run)return;
+ const X=v=>40+(v-run.min)/(run.max-run.min)*(W-80),rows=run.steps.length+1,Y=i=>40+i*(H-70)/Math.max(rows-1,1);
+ g.strokeStyle="#334155";g.fillStyle="#94A3B8";g.font="11px sans-serif";g.beginPath();g.moveTo(40,22);g.lineTo(W-40,22);g.stroke();
+ for(let k=0;k<=10;k++){const v=Math.round(run.min+k*(run.max-run.min)/10);g.fillText(v,X(v)-8,14)}
+ const pts=[{p:run.head,v:0},...run.steps.map(s=>({p:s.p,v:s.v}))];
+ pts.forEach(q=>{if(q.v){g.fillStyle="#398BFF22";g.fillRect(X(q.p)-0.5,22,1,H)}});
+ g.shadowColor="#00E5FF";g.shadowBlur=10;g.lineWidth=2;g.strokeStyle="#00E5FF";g.beginPath();
+ for(let i=0;i<=idx+1&&i<pts.length;i++){const x=X(pts[i].p),y=Y(i);i?g.lineTo(x,y):g.moveTo(x,y)}g.stroke();g.shadowBlur=0;
+ for(let i=0;i<=idx+1&&i<pts.length;i++){const x=X(pts[i].p),y=Y(i);g.fillStyle=i==0?"#10B981":pts[i].v?"#A855F7":"#94A3B8";g.beginPath();g.arc(x,y,5,0,7);g.fill();
+  if(i){g.fillStyle="#F8FAFC";const lbl=pts[i].p+" ("+(pts[i].p>=pts[i-1].p?"→":"←")+run.steps[i-1].s+")",w=g.measureText(lbl).width;g.fillText(lbl,x+w+14>W?x-w-8:x+8,y+4)}}
+ explain();hilite()}
+function explain(){if(!run)return;const s=run.steps[idx],prev=idx?run.steps[idx-1].p:run.head,rem=run.steps.slice(idx+1).filter(x=>x.v).length;
+ $("expl").innerHTML=`<b style="color:var(--tx)">Step ${idx+1}/${run.steps.length}</b> — head moves ${prev} → <b style="color:var(--cy)">${s.p}</b> (${s.p>=prev?"right":"left"}), distance ${s.s}, cumulative ${cum(idx)}. Remaining requests: ${rem}. ${s.v?"This cylinder is a requested one and is serviced.":"Boundary/jump move: not a request, but the algorithm travels here by design."} (${run.name})`}
+function table(){const t=$("seq");t.innerHTML=t.rows[0].outerHTML;let c=0;
+ run.steps.forEach((s,i)=>{c+=s.s;const tr=t.insertRow();tr.onclick=()=>{stop();idx=i;draw()};[i+1,s.p,s.s,c,s.v?"Request":"Boundary/Jump"].forEach(v=>tr.insertCell().textContent=v)})}
+function hilite(){const t=$("seq");[...t.rows].forEach((r,i)=>r.classList.toggle("cur",i===idx+1))}
+function stop(){clearInterval(timer);timer=null}
+function play(){if(!run)return;stop();if(idx>=run.steps.length-1)idx=0;timer=setInterval(()=>{if(idx>=run.steps.length-1)return stop();idx++;draw()},1100-$("spd").value*100)}
+function step(d){if(run){const n=idx+d;if(n>=0&&n<run.steps.length){idx=n;draw()}}}
+
+/* ---------- wiring ---------- */
+$("run").onclick=runOne;$("all").onclick=async()=>{await compare();await runOne()};$("play").onclick=play;$("pause").onclick=stop;
+$("next").onclick=()=>step(1);$("prev").onclick=()=>step(-1);$("sreset").onclick=()=>{stop();idx=0;draw()};
+$("spd").oninput=()=>{if(timer)play()};
+$("ex").onclick=()=>{$("req").value=EX;$("head").value=53;$("min").value=0;$("max").value=199;$("dir").value=1;$("err").textContent=""};
+$("rnd").onclick=()=>{const lo=+$("min").value,hi=+$("max").value;if(!(lo<hi))return $("err").textContent="Set a valid min/max first.";
+ $("req").value=Array.from({length:8},()=>lo+Math.floor(Math.random()*(hi-lo+1))).join(",");$("head").value=lo+Math.floor(Math.random()*(hi-lo+1));$("err").textContent=""};
+$("rst").onclick=()=>{stop();run=null;all=[];["req","head"].forEach(i=>$(i).value="");$("min").value=0;$("max").value=199;$("err").textContent="";draw();
+ for(let i=0;i<7;i++)$("s"+i).textContent=i==4?"–":0;$("s4").style.fontSize="";$("title").textContent="";$("expl").textContent="Run a simulation to begin.";
+ const c=$("ctab");c.innerHTML=c.rows[0].outerHTML;const q=$("seq");q.innerHTML=q.rows[0].outerHTML};
+$("csv").onclick=()=>{if(!run)return $("err").textContent="Run a simulation first.";
+ let o=`Algorithm,${run.name}\nHead,${run.head}\nRange,${run.min}-${run.max}\n\nStep,Cylinder,Seek,Cumulative,Type\n`,c=0;run.steps.forEach((s,i)=>{c+=s.s;o+=`${i+1},${s.p},${s.s},${c},${s.v?"Request":"Boundary"}\n`});
+ if(all.length)o+="\nAlgorithm,Total,Average\n"+all.map(a=>`${a.name},${a.total},${a.avg.toFixed(2)}`).join("\n");
+ const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([o],{type:"text/csv"}));a.download="nexus_report.csv";a.click();URL.revokeObjectURL(a.href)};
+$("pdf").onclick=()=>window.print();
+["req","head","min","max"].forEach(i=>$(i).addEventListener("keydown",e=>{if(e.key==="Enter")$("all").click()}));
+document.addEventListener("keydown",e=>{if(/INPUT|SELECT/.test(e.target.tagName))return;if(e.key==="ArrowRight")step(1);else if(e.key==="ArrowLeft")step(-1);else if(e.key===" "){e.preventDefault();timer?stop():play()}});
+window.addEventListener("resize",()=>{fit();draw()});
+const secs=["overview","config","sim","cmp","rep","about"];
+addEventListener("scroll",()=>{let cur=secs[0];secs.forEach(s=>{if($(s).getBoundingClientRect().top<120)cur=s});document.querySelectorAll("aside a").forEach(a=>a.classList.toggle("on",a.hash==="#"+cur))},{passive:true});
+$("ex").click();fit();
+initEngine().then(async()=>{if(engine){badge("ok",engine.name);await compare();await runOne()}else{badge("bad","Engine offline");$("err").textContent="C engine not found. Run ./run.sh (recommended) or build WASM – see README."}});
+</script></body></html>
